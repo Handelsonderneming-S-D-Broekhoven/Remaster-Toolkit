@@ -4,7 +4,10 @@ name: sstre-checks
 #  - validate: Markdown relative links and the forbidden-file scan (game data,
 #    model weights; rules as implemented by the umbrella's
 #    scripts/validate_repo.py fetched at a PINNED umbrella commit);
-#  - reuse:    REUSE (SPDX licensing metadata) compliance.
+#  - reuse:    REUSE (SPDX licensing metadata) compliance;
+#  - pytest:   synthetic, CPU-only unit tests (JCS, recipes, cache/resume,
+#    tiling, QA, fallback ladder, provenance schema). No torch, no model
+#    weights, no game data: GPU steps are replaced by CPU stand-ins in tests.
 # No game data, no GPU, no secrets. To update the validator, bump
 # SSTRE_UMBRELLA_COMMIT to a reviewed umbrella commit (full 40-hex SHA).
 
@@ -74,3 +77,41 @@ jobs:
 
       - name: REUSE lint
         run: reuse lint
+
+  pytest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          persist-credentials: false
+
+      - name: Check out umbrella schemas (same pinned commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Handelsonderneming-S-D-Broekhoven/SSTRE
+          ref: ${{ env.SSTRE_UMBRELLA_COMMIT }}
+          path: umbrella
+          sparse-checkout: schemas
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies (pinned, CPU only)
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "numpy==2.2.6" "Pillow==12.3.0" "pytest==8.4.2" "jsonschema==4.26.0"
+
+      - name: Run pytest
+        working-directory: repo
+        # Imported from src/ directly (no build step). Schema tests skip if the
+        # pinned umbrella commit lacks a schema.
+        env:
+          PYTHONPATH: src
+          SSTRE_SCHEMAS_DIR: ${{ github.workspace }}/umbrella/schemas
+        run: python -m pytest -p no:cacheprovider

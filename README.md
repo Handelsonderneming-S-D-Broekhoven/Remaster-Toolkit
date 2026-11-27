@@ -8,10 +8,14 @@ Croteam and Devolver Digital.
 
 ## Status
 
-**Phase 0 — bootstrap and research. No code exists yet.** Model, workflow and
-framework choices are under research in the SSTRE umbrella
-(`docs/research/RD-003-ai-pipeline.md`, `docs/research/RD-004-reproducibility.md`)
-and are not decided.
+**Proof of concept (SSTRE sprint 2, EXP-013).** A minimal Python package
+`remaster_toolkit` exists: recipe resolution and RFC 8785 canonical hashing,
+a content-addressed step cache with resume and incremental invalidation,
+spandrel-loaded super-resolution, opt-in SDXL + tile-ControlNet refinement,
+seamless (wrap) tiling, alpha handling, classical normal/height derivation,
+automated QA with a fallback ladder, and build-provenance records. Interfaces
+are unstable (`0.1.0.dev0`). Model choices are not final; see SSTRE
+`docs/experiments/EXP-013-ai-texture-poc.md` for measured results.
 
 ## Role
 
@@ -50,27 +54,39 @@ Planned responsibilities:
 
 | Item | Status |
 |---|---|
-| Implementation language | **TBD** (Python is a candidate, not decided) |
-| Inference stack (e.g. PyTorch, ComfyUI or a headless equivalent) | **TBD** — to be benchmarked |
-| Models (e.g. Real-ESRGAN/SwinIR, SDXL with tiled conditioning) | **TBD** — availability, licenses and quality to be verified |
-| GPU / VRAM requirements | **TBD** — to be measured; CI will not require a GPU |
-| Reference environment for reproducibility | **TBD** — see RD-004 |
+| Language | Python >= 3.10 |
+| Core dependencies (CPU, CI) | `numpy`, `Pillow` |
+| Optional: SR (`[sr]`) | `torch`, `spandrel` (MIT), `safetensors` |
+| Optional: diffusion (`[diffusion]`) | `diffusers`, `transformers`, `accelerate` (Apache-2.0) |
+| Optional: perceptual metrics (`[metrics]`) | `lpips` (BSD-2-Clause), `DISTS_pytorch` (MIT); `pyiqa` is deliberately not used (non-commercial licence) |
+| Models | Never bundled or fetched implicitly. Users download weights themselves and register them by SHA-256 (`remaster-toolkit models-register`); recipes reference models by hash only. |
+| GPU | Optional; CI runs CPU-only synthetic tests |
 
 ## Development
 
-There is nothing to build or test yet. The planned `src/`, `tests/fixtures/`
-and `workflows/` directories are intentionally absent until implementation
-starts, so the repository does not contain placeholder code.
-
-What works today:
-
 ```sh
-git clone https://github.com/Handelsonderneming-S-D-Broekhoven/Remaster-Toolkit.git
-git clone https://github.com/Handelsonderneming-S-D-Broekhoven/SSTRE.git
-# Link and forbidden-file checks for this repository
-# (requires Python 3.10+; see SSTRE CONTRIBUTING.md):
-python SSTRE/scripts/validate_repo.py --root Remaster-Toolkit --skip-schemas
+python -m pip install -e ".[test]"        # core + tests (CPU only)
+SSTRE_SCHEMAS_DIR=../SSTRE/schemas python -m pytest
+python SSTRE/scripts/validate_repo.py --root Remaster-Toolkit
+reuse lint
 ```
+
+CLI (`remaster-toolkit <verb>`; exit codes 0 ok, 1 completed with fallbacks
+or failures, 2 usage/environment error, 3 schema violation):
+
+| Verb | Purpose |
+|---|---|
+| `resolve --layer NAME=PATH ...` | Merge recipe layers (lowest precedence first; `deep-merge/arrays-replace/null-deletes@1`) |
+| `hash FILE [--recipe]` | RFC 8785 JCS hash / `resolvedRecipeHash` |
+| `inspect IMAGE` | Size, alpha kind, power-of-two, wrap-seam ratio |
+| `models-register` | Hash and register a local model file or directory bundle |
+| `run --recipe R --source IMG --workspace W --output O` | Execute one resolved recipe with caching, QA, fallback and provenance |
+| `compare A B` | Pixel-level comparison of two images |
+
+Package layout: `src/remaster_toolkit/` (`jcs`, `recipe`, `cache`, `executor`,
+`ops`, `sr`, `diffusion`, `tiling`, `resample`, `alpha`, `pbr`, `qa`,
+`perceptual`, `workflows`, `policy`, `models`, `env`, `cli`); tests use only
+procedurally generated images and CPU stand-ins for GPU steps.
 
 ## Licensing
 

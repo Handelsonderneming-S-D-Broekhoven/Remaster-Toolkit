@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 Handelsonderneming S.D. Broekhoven, trading as ITEagle Europe
+# SPDX-License-Identifier: GPL-3.0-only
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remaster-toolkit"
+version = "0.1.0.dev0"
+description = "Game-agnostic, reproducible texture processing: cached recipes, SR, controlled diffusion, QA, provenance"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-only" }
+authors = [{ name = "Handelsonderneming S.D. Broekhoven, trading as ITEagle Europe" }]
+# Core (CPU, CI): numpy + Pillow only. GPU/model features are optional extras;
+# model weights are never bundled or downloaded implicitly.
+dependencies = ["numpy>=1.24", "Pillow>=10"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "jsonschema>=4.18"]
+# Versions verified in EXP-013 (Windows, Python 3.10, CUDA 13.0 wheels):
+sr = ["torch>=2.9", "spandrel>=0.4.2", "safetensors>=0.4"]
+diffusion = ["diffusers>=0.41", "transformers>=4.50", "accelerate>=1.0"]
+metrics = ["lpips>=0.1.4", "DISTS_pytorch>=0.1"]
+
+[project.scripts]
+remaster-toolkit = "remaster_toolkit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
