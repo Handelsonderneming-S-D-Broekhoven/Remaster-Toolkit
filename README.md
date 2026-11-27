@@ -76,7 +76,7 @@ python SSTRE/scripts/validate_repo.py --root Remaster-Toolkit --skip-schemas
 
 Copyright © 2026 Handelsonderneming S.D. Broekhoven, trading as ITEagle Europe, and contributors.
 
-`SPDX-License-Identifier: GPL-3.0-only` — licensed under the GNU General Public License, version 3 only ([`LICENSE`](LICENSE); machine-readable in [`REUSE.toml`](REUSE.toml)). See SSTRE [ADR-0006](https://github.com/Handelsonderneming-S-D-Broekhoven/SSTRE/blob/main/docs/adr/0006-licensing-boundaries.md) for the licensing boundaries between repositories. Model and dependency licenses are recorded before any is adopted.
+License: GPL-3.0-only — licensed under the GNU General Public License, version 3 only ([`LICENSE`](LICENSE); machine-readable in [`REUSE.toml`](REUSE.toml)). See SSTRE [ADR-0006](https://github.com/Handelsonderneming-S-D-Broekhoven/SSTRE/blob/main/docs/adr/0006-licensing-boundaries.md) for the licensing boundaries between repositories. Model and dependency licenses are recorded before any is adopted.
 
 
 ## Related repositories
