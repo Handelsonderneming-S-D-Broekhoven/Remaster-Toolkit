@@ -103,7 +103,7 @@ def build(asset_id: str, source: dict, texture_class: str, models: dict, *,
             last = "dilate"
         steps.append({"stepId": "rgb", "op": "alpha-split", "inputs": [last], "channels": "rgb"})
         steps.append(_sr_step("sr", "rgb", models[sr_role], scale,
-                              "wrap" if (wu or wv) else "reflect", 16 if (wu or wv) else 8,
+                              "wrap" if (wu or wv) else "reflect", 32 if (wu or wv) else 8,
                               precision, tile, axes=axes))
         color = "sr"
         if ts != scale:

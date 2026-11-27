@@ -122,7 +122,9 @@ def run(img: np.ndarray, sdxl_dir: str, cn_dir: str, step: dict, device: str) ->
                    control_guidance_start=float(d.get("controlStart", 0.0)),
                    control_guidance_end=float(d.get("controlEnd", 1.0)),
                    height=wh, width=ww, generator=gen, output_type="latent").images
-        vae = pipe.vae  # fp32; accelerate offload hook moves it to the GPU
+        # diffusers' img2img casts the (force_upcast) VAE back to the pipeline
+        # dtype after encoding; decode explicitly in float32.
+        vae = pipe.vae.to(dtype=torch.float32)  # offload hook moves it to the GPU
         lat = lat.to(device=pipe._execution_device, dtype=torch.float32) / vae.config.scaling_factor
         out = vae.decode(lat, return_dict=False)[0]
     y = ((out[0].float().clamp(-1, 1) + 1) / 2).permute(1, 2, 0).cpu().numpy().astype(np.float32)

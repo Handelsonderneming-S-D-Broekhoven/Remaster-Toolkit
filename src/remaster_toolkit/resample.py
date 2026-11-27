@@ -95,10 +95,14 @@ def resize(img: np.ndarray, width: int, height: int, filt: str = "lanczos3",
         img = img[:, :, None]
     h, w, _ = img.shape
     a = img.astype(np.float64)
+    c = a.shape[2]
+    # float64 BLAS matmul (numpy-bundled); run-to-run stability is checked by
+    # the double-build hash tests rather than assumed.
     if height != h or filt == "nearest":
-        a = np.einsum("oi,ijc->ojc", weight_matrix(h, height, filt, my), a, optimize=False)
+        a = (weight_matrix(h, height, filt, my) @ a.reshape(h, -1)).reshape(height, -1, c)
     if width != w or filt == "nearest":
-        a = np.einsum("pj,ojc->opc", weight_matrix(w, width, filt, mx), a, optimize=False)
+        wm = weight_matrix(w, width, filt, mx)
+        a = (wm @ a.transpose(1, 0, 2).reshape(w, -1)).reshape(width, -1, c).transpose(1, 0, 2)
     if clip:
         a = np.clip(a, 0.0, 1.0)
     return a.astype(np.float32)
