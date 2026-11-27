@@ -144,6 +144,10 @@ def cpu_runtime_class() -> str:
 
 def gpu_runtime_class(precision: dict) -> str:
     """Unproven GPU steps key on the full environment fingerprint (RD-004 s6)."""
+    try:  # the fingerprint must not depend on whether torch was imported yet
+        import torch  # noqa: F401
+    except ImportError:
+        pass
     v = _versions()
     g = gpu_info()
     fp = {"gpus": [{k: x.get(k) for k in ("name", "smCount", "computeCapability", "driverVersion")}

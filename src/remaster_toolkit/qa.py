@@ -187,15 +187,31 @@ def compare(out: np.ndarray, src: np.ndarray, wrap_u: bool, wrap_v: bool,
         vis = np.ones(src.shape[:2], bool)
     m["ssim-downscaled"] = ssim(luma_srgb(d_rgb), luma_srgb(s_rgb))
     m["psnr-downscaled"] = psnr(d_rgb, s_rgb)
-    de = delta_e2000(down, src)[vis]
+    # Colour drift = CIEDE2000 of low-passed images (gaussian sigma 1.5 source px):
+    # measures colour/tone shift, not the texture detail SR is meant to add.
+    k = _gauss1d(9, 1.5)
+    lp = lambda x: np.stack([_filt(x[:, :, c], k, wrap=wrap_u or wrap_v) for c in range(3)], axis=2)
+    if alpha_kind != "none" and src.shape[2] == 4:
+        # alpha-weighted low-pass (weights = source alpha) so hidden colour never mixes in
+        wa = src[:, :, 3:4].astype(np.float64)
+        wsum = np.maximum(lp(np.repeat(wa, 3, axis=2)), 1e-6)
+        de = delta_e2000(lp(down[:, :, :3] * wa) / wsum, lp(src[:, :, :3] * wa) / wsum)[vis]
+    else:
+        de = delta_e2000(lp(down[:, :, :3]), lp(src[:, :, :3]))[vis]
     m["deltaE2000-mean"] = float(de.mean())
     m["deltaE2000-p95"] = float(np.percentile(de, 95))
+    m["deltaE2000-perpixel-mean"] = float(delta_e2000(down, src)[vis].mean())
     m["hist-bhattacharyya"] = hist_bhattacharyya(down[vis][:, None, :], src[vis][:, None, :])
     m["luminance-shift"] = float(luminance(down)[vis].mean() - luminance(src)[vis].mean())
     m["clip-fraction-delta"] = clip_fraction(out) - clip_fraction(src)
     if wrap_u or wrap_v:
-        m["seam-ratio"] = seam_ratio(out, wrap_u, wrap_v)
-        m["seam-ratio-source"] = seam_ratio(src, wrap_u, wrap_v)
+        if alpha_kind != "none" and src.shape[2] == 4 and out.shape[2] == 4:
+            pm = lambda x: x[:, :, :3] * x[:, :, 3:4]  # premultiplied: ignore hidden colour
+            m["seam-ratio"] = seam_ratio(pm(out), wrap_u, wrap_v)
+            m["seam-ratio-source"] = seam_ratio(pm(src), wrap_u, wrap_v)
+        else:
+            m["seam-ratio"] = seam_ratio(out, wrap_u, wrap_v)
+            m["seam-ratio-source"] = seam_ratio(src, wrap_u, wrap_v)
     if reference is not None and reference.shape[:2] == out.shape[:2]:
         lv_ref = laplacian_var(reference)
         m["hf-energy-ratio"] = laplacian_var(out) / max(lv_ref, 1e-12)

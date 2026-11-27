@@ -297,10 +297,12 @@ def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
         sh, sw = src_img.shape[:2]
         mode = ("wrap" if til.get("wrapV") else "clamp", "wrap" if til.get("wrapU") else "clamp")
         down = downscale_area(out_img, sw, sh, mode)
-        for k, v in perceptual.compare(down, src_img).items():
+        def pm(x):  # premultiply by source/own alpha so hidden colour is ignored
+            return x[:, :, :3] * x[:, :, 3:4] if x.shape[2] == 4 else x
+        for k, v in perceptual.compare(pm(down), pm(src_img)).items():
             m[k] = v
         if sr_only is not None and sr_only.shape == out_img.shape:
-            for k, v in perceptual.compare(out_img, sr_only).items():
+            for k, v in perceptual.compare(pm(out_img), pm(sr_only)).items():
                 m[k + "@sr-only"] = v
     results, reasons = [], []
     # implicit hard checks (RD-008 s6.1)
