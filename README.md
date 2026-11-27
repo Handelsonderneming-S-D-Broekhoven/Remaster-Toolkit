@@ -74,12 +74,10 @@ python SSTRE/scripts/validate_repo.py --root Remaster-Toolkit --skip-schemas
 
 ## Licensing
 
-License: proposed GPL-3.0. `LICENSE` contains the unmodified GNU GPL v3 text,
-added on the unpublished `phase0/bootstrap` branch as a proposal. The SPDX
-identifier (`GPL-3.0-only` as the plan proposes, or `GPL-3.0-or-later`) awaits
-owner confirmation; see [ADR-0006](https://github.com/Handelsonderneming-S-D-Broekhoven/SSTRE/blob/phase0/bootstrap/docs/adr/0006-licensing-boundaries.md)
-and SSTRE `docs/research/RD-007-licensing.md`. Model and dependency licenses will be recorded
-before any is adopted.
+Copyright © 2026 Handelsonderneming S.D. Broekhoven, trading as ITEagle Europe, and contributors.
+
+`SPDX-License-Identifier: GPL-3.0-only` — licensed under the GNU General Public License, version 3 only ([`LICENSE`](LICENSE); machine-readable in [`REUSE.toml`](REUSE.toml)). See SSTRE [ADR-0006](https://github.com/Handelsonderneming-S-D-Broekhoven/SSTRE/blob/main/docs/adr/0006-licensing-boundaries.md) for the licensing boundaries between repositories. Model and dependency licenses are recorded before any is adopted.
+
 
 ## Related repositories
 
