@@ -100,6 +100,23 @@ def test_policy_blocks_diffusion_for_forbidden_class(tmp_path, stub_sr):
     _check_schema(res["provenance"])
 
 
+def test_conservative_sky_skips_sr(tmp_path, stub_sr):
+    img = ramp_texture(16)
+    data, h = source_png(img)
+    body = workflows.build("synthetic:sky", _src_meta(img, h), "sky", MODELS)
+    body["materialProfile"] = "conservative/sky"
+    res = build_asset(_resolve(body), data, Context(tmp_path, device="cpu"))
+    prov = res["provenance"]
+    att = prov["fallback"]["attempts"]
+    assert att[0] == {"attemptId": "primary", "outcome": "not-run", "reason": "SKY_FLATTEN"}
+    assert prov["fallback"]["selectedMode"] == "conventional-resample" and res["ladder"] == "L1"
+    assert all(s["stepId"].startswith("fb-") for s in prov["steps"])
+    _check_schema(prov)
+    # outside the conservative profile the class keeps its SR primary
+    body["materialProfile"] = "default/sky"
+    assert build_asset(_resolve(body), data, Context(tmp_path / "b", device="cpu"))["ladder"] == "L2"
+
+
 def test_fallback_ladder_reason_codes(tmp_path, stub_sr):
     img = ramp_texture(16)
     data, h = source_png(img)
@@ -191,3 +208,15 @@ def test_horizontal_wrap_only_and_supersampled_target(tmp_path, stub_sr):
     assert out.shape == (128, 64, 3)
     assert qa.seam_ratio(out, wrap_u=True, wrap_v=False) < 1.5
     assert qa.seam_ratio(out, wrap_u=False, wrap_v=True) > 2.0
+
+
+def test_identical_output_has_canonical_provenance(tmp_path):
+    """UI resample of a flat image is lossless -> PSNR = inf; provenance must still hash."""
+    from remaster_toolkit.executor import lock_entry
+    img = np.full((16, 16, 3), 0.5, np.float32)
+    data, h = source_png(img)
+    body = workflows.build("synthetic:flat", _src_meta(img, h), "ui-text", MODELS, scale=1)
+    res = build_asset(_resolve(body), data, Context(tmp_path, device="cpu"))
+    lock_entry(res)  # must not raise
+    psnr = [r for r in res["provenance"]["qa"]["results"] if r["metric"] == "psnr-downscaled"][0]
+    assert psnr["value"] == "inf"
