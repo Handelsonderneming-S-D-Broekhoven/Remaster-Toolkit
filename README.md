@@ -88,8 +88,28 @@ or failures, 2 usage/environment error, 3 schema violation):
 
 Package layout: `src/remaster_toolkit/` (`jcs`, `recipe`, `cache`, `executor`,
 `ops`, `sr`, `diffusion`, `tiling`, `resample`, `alpha`, `pbr`, `qa`,
-`perceptual`, `workflows`, `policy`, `models`, `env`, `cli`); tests use only
+`perceptual`, `workflows`, `policy`, `effects`, `models`, `env`, `cli`); tests use only
 procedurally generated images and CPU stand-ins for GPU steps.
+
+### Effect and UI textures (SSTRE M0.1, POC-85/86)
+
+- `effects.classify(usages, stats, exception)` assigns an effect class from caller-supplied
+  **usage metadata** (consumer and blend semantics: `additive`, `additive-alpha`,
+  `alpha-blend`, `premultiplied`, `multiply`, `multiply-inverse`, or `texel-lookup`
+  consumers). Pixel statistics only confirm the declaration; filenames and colours are
+  never used. Exceptions are declarative entries with a mandatory reason.
+- `workflows.build(..., effect_class=...)` gives the `effect` workflow: ringing-free
+  (anti-ringing clamped Lanczos) resampling, RGB and alpha filtered independently,
+  straight alpha filtered premultiplied, colour under fully transparent texels kept as
+  in the original, no learned SR, diffusion or sharpening (refused by `policy` with
+  `EFFECT_NO_LEARNED`), effect QA (neutral lift, halos, energy, alpha, hidden colour,
+  alpha coverage per mip level) and a fallback straight to the original. `lut` and
+  `mixed` classes keep the original.
+- `ui_kind="text"` gives the same alpha-aware, ringing-free path for UI textures, with a
+  glyph IoU gate; `ui_kind="glyph-atlas"` keeps font atlases original. Without
+  `ui_kind` the legacy `ui` workflow is unchanged.
+- `effects.mip_chain(..., cutout=t)` builds an alpha-coverage-preserving mip chain for
+  packagers.
 
 ## Licensing
 
