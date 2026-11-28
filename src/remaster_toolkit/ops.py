@@ -99,9 +99,15 @@ def op_resample(step, inputs, ctx):
     filt = step.get("filter", "lanczos3")
     if filt not in FILTERS:
         raise ValueError(f"filter {filt} not implemented")
-    if (step.get("params") or {}).get("normalMap"):
+    p = step.get("params") or {}
+    if p.get("normalMap"):
         return pbr.resample_normals(img, tw, th, filt, _edge(step)), {}
-    return resize(img, tw, th, filt, _edge(step)), {}
+    if p.get("effectSemantics"):
+        from . import effects
+        return effects.resample(img, tw, th, p["effectSemantics"], filt, _edge(step),
+                                bool(p.get("antiRinging", True))), {}
+    return resize(img, tw, th, filt, _edge(step),
+                  anti_ringing=bool(p.get("antiRinging", False))), {}
 
 
 def op_sr(step, inputs, ctx):
@@ -178,8 +184,8 @@ OPS = {
     "alpha-split": (op_alpha_split, []),
     "alpha-merge": (op_alpha_merge, ["alpha", "resample"]),
     "edge-dilate": (op_edge_dilate, ["alpha"]),
-    "resample": (op_resample, ["resample", "pbr"]),
-    "downscale": (op_resample, ["resample", "pbr"]),
+    "resample": (op_resample, ["resample", "pbr", "effects", "alpha"]),
+    "downscale": (op_resample, ["resample", "pbr", "effects", "alpha"]),
     "sr": (op_sr, ["sr", "tiling"]),
     "controlled-diffusion": (op_diffusion, ["diffusion", "resample"]),
     "seam-fix": (op_seam_fix, ["tiling"]),

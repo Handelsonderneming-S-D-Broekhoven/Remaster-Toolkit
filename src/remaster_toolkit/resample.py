@@ -83,13 +83,59 @@ def weight_matrix(n_in: int, n_out: int, filt: str, mode: str) -> np.ndarray:
     return W
 
 
+def footprint_minmax(img: np.ndarray, width: int, height: int,
+                     mode="clamp") -> tuple[np.ndarray, np.ndarray]:
+    """Per output texel, the min and max of the source texels around its centre.
+
+    The window is the 2x2 bilinear footprint when magnifying and the box of
+    source texels covered by the output texel when minifying (separable, so
+    min/max over the rectangle is exact). Used to clamp a ringing kernel.
+    """
+    my, mx = (mode, mode) if isinstance(mode, str) else mode
+    if img.ndim == 2:
+        img = img[:, :, None]
+    a = img.astype(np.float64)
+
+    def axis(arr, n_out, m, ax):
+        n_in = arr[0].shape[ax]
+        s = n_out / n_in
+        c = (np.arange(n_out) + 0.5) / s - 0.5
+        r = max(0.0, 0.5 / s - 0.5)  # extra half-width when minifying
+        j0 = np.floor(c - r).astype(np.int64)
+        j1 = np.ceil(c + r).astype(np.int64)
+        j1 = np.maximum(j1, j0 + 1)
+        width_max = int((j1 - j0).max()) + 1
+        lo = hi = None
+        for k in range(width_max):
+            j = np.minimum(j0 + k, j1)
+            t_lo = np.take(arr[0], _index(j, n_in, m), axis=ax)
+            t_hi = np.take(arr[1], _index(j, n_in, m), axis=ax)
+            lo = t_lo if lo is None else np.minimum(lo, t_lo)
+            hi = t_hi if hi is None else np.maximum(hi, t_hi)
+        return lo, hi
+
+    lo, hi = axis((a, a), height, my, 0)
+    lo, hi = axis((lo, hi), width, mx, 1)
+    return lo, hi
+
+
 def resize(img: np.ndarray, width: int, height: int, filt: str = "lanczos3",
-           mode="clamp", clip: bool = True) -> np.ndarray:
+           mode="clamp", clip: bool = True, anti_ringing: bool = False) -> np.ndarray:
     """Resize HxWxC float image to (height, width).
 
     ``mode`` is one edge mode or a (rows, cols) pair, e.g. ("clamp", "wrap")
-    for a texture that tiles horizontally only.
+    for a texture that tiles horizontally only. ``anti_ringing`` clamps every
+    output texel to the min/max of its source footprint
+    (:func:`footprint_minmax`), so a sharp kernel (Lanczos, bicubic) cannot
+    create overshoot halos, dark outlines or lift a black background.
     """
+    if anti_ringing:
+        out = resize(img, width, height, filt, mode, clip=False)
+        lo, hi = footprint_minmax(img, width, height, mode)
+        out = np.clip(out, lo, hi)
+        if clip:
+            out = np.clip(out, 0.0, 1.0)
+        return out.astype(np.float32)
     my, mx = (mode, mode) if isinstance(mode, str) else mode
     if img.ndim == 2:
         img = img[:, :, None]

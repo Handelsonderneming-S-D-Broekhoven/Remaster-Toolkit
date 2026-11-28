@@ -26,7 +26,7 @@ from typing import Callable
 
 import numpy as np
 
-from . import __version__, imagebuf, perceptual, policy, qa
+from . import __version__, effects, imagebuf, perceptual, policy, qa
 from .cache import Cache
 from .env import cpu_runtime_class, environment, executor_identity, gpu_runtime_class
 from .hashing import jcs_hash, sha256_bytes
@@ -281,6 +281,18 @@ def _cmp(v, comp: str, thr) -> bool:
     return v == thr
 
 
+def _effect_semantics(recipe: dict) -> str | None:
+    """Semantics for the implicit effect QA: the effect class, or for alpha-aware UI
+    recipes straight alpha (alpha present) / plain colour (no alpha)."""
+    cls = policy.profile_segment(recipe, "effect")
+    if cls is not None:
+        return None if cls in policy.EFFECT_KEEP_ORIGINAL else cls
+    if policy.profile_segment(recipe, "ui") is not None:
+        kind = ((recipe.get("source") or {}).get("alpha") or {}).get("kind", "none")
+        return "alpha-blend" if kind != "none" else "additive"
+    return None
+
+
 def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
                    sr_only: np.ndarray | None, ctx: Context, attempt: str) -> tuple[list, list, dict]:
     src = recipe.get("source", {})
@@ -326,6 +338,25 @@ def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
     for name, code in hard:
         results.append({"metric": name, "value": None, "passed": False, "attemptId": attempt})
         reasons.append((code, "fail-asset" if code != "ALPHA_MISSING" else "fallback"))
+    # implicit effect / UI checks (effects.QA_LIMITS): the gate metric enum of the recipe
+    # schema has no effect metrics yet, so they are evaluated here and recorded by name.
+    sem = _effect_semantics(recipe)
+    if sem is not None:
+        mode = ("wrap" if til.get("wrapV") else "clamp", "wrap" if til.get("wrapU") else "clamp")
+        is_ui = policy.profile_segment(recipe, "effect") is None
+        em = effects.qa_metrics(out_img, src_img, sem, mode,
+                                cut if kind == "binary-cutout" else None, coverage=not is_ui)
+        for k, v in em.items():
+            m["effect:" + k] = v
+            lim = effects.QA_LIMITS.get(k)
+            if lim is None:
+                continue
+            ok = v <= lim
+            results.append({"metric": "effect:" + k, "value": v, "threshold": lim,
+                            "comparator": "<=", "reference": "source", "passed": bool(ok),
+                            "attemptId": attempt})
+            if not ok:
+                reasons.append((effects.REASONS[k], "fallback"))
     for g in gates:
         metric, ref = g["metric"], g.get("reference", "source")
         key = metric + "@sr-only" if (ref == "sr-only" and metric in ("lpips-v0.1-alex", "dists")) else metric
@@ -346,6 +377,8 @@ def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
     # informational signals
     for k in sorted(m):
         if k in {g["metric"] for g in gates} or k == "dimensions":
+            continue
+        if k.startswith("effect:") and k[7:] in effects.QA_LIMITS:
             continue
         v = m[k]
         if isinstance(v, bool):
