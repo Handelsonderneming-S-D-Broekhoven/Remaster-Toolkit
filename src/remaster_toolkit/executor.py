@@ -304,6 +304,12 @@ def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
         if sr_only is not None and sr_only.shape == out_img.shape:
             for k, v in perceptual.compare(pm(out_img), pm(sr_only)).items():
                 m[k + "@sr-only"] = v
+    import math
+    # JSON/JCS cannot carry non-finite numbers (e.g. PSNR of identical images = inf):
+    # record them as strings ("inf", "nan") so provenance stays canonicalisable.
+    for k, v in list(m.items()):
+        if isinstance(v, float) and not math.isfinite(v):
+            m[k] = "inf" if v > 0 else ("-inf" if v < 0 else "nan")
     results, reasons = [], []
     # implicit hard checks (RD-008 s6.1)
     hard = []
@@ -328,8 +334,8 @@ def evaluate_gates(recipe: dict, out_img: np.ndarray, src_img: np.ndarray,
         if metric == "dimensions":
             ok = (m["pot"] if thr == "pot" else m["dimensions"] == thr)
             v = m["dimensions"]
-        elif v is None:
-            ok = None  # metric unavailable: recorded, non-blocking
+        elif v is None or isinstance(v, str):
+            ok = None  # metric unavailable or non-finite: recorded, non-blocking
         else:
             ok = bool(_cmp(float(v), g["comparator"], float(thr)))
         results.append({"metric": metric, "value": v, "threshold": thr,

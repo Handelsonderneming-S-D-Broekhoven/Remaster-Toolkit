@@ -191,3 +191,15 @@ def test_horizontal_wrap_only_and_supersampled_target(tmp_path, stub_sr):
     assert out.shape == (128, 64, 3)
     assert qa.seam_ratio(out, wrap_u=True, wrap_v=False) < 1.5
     assert qa.seam_ratio(out, wrap_u=False, wrap_v=True) > 2.0
+
+
+def test_identical_output_has_canonical_provenance(tmp_path):
+    """UI resample of a flat image is lossless -> PSNR = inf; provenance must still hash."""
+    from remaster_toolkit.executor import lock_entry
+    img = np.full((16, 16, 3), 0.5, np.float32)
+    data, h = source_png(img)
+    body = workflows.build("synthetic:flat", _src_meta(img, h), "ui-text", MODELS, scale=1)
+    res = build_asset(_resolve(body), data, Context(tmp_path, device="cpu"))
+    lock_entry(res)  # must not raise
+    psnr = [r for r in res["provenance"]["qa"]["results"] if r["metric"] == "psnr-downscaled"][0]
+    assert psnr["value"] == "inf"
