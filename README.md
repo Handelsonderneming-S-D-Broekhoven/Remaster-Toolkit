@@ -28,6 +28,9 @@ Planned responsibilities:
   diffusion unless explicitly configured;
 - generate PBR maps where supported, labelled as inferred, not measured;
 - automated QA with fallback to conservative processing or the original;
+  per-class policy rules can skip a rung with a recorded reason code (for
+  example the conservative profile resamples `sky` conventionally,
+  `SKY_FLATTEN`, because general SR models flatten its fine grain);
 - content-addressed caching and provenance records;
 - later, curation tooling.
 
